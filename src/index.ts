@@ -1,137 +1,180 @@
 import express from 'express';
 import type { Request, Response } from 'express';
+
+import { genkit, z } from 'genkit';
+import { mcpServer } from 'genkitx-mcp';
 import { config } from 'dotenv';
 import { DEV } from 'esm-env';
 import { FusionAuthClient } from '@fusionauth/typescript-client'; // Import the official client
+import googleAI from '@genkit-ai/googleai';
+
+const MODEL = 'googleai/gemini-2.5-flash-preview-05-20'; // Define the model to use
 
 // Load environment variables from .env file
 config();
 
-const app = express();
-const port = process.env.PORT || 3000;
-
-app.use(express.json()); // Enable JSON body parsing
-
 // Configure FusionAuth Client using the official library
 const fusionAuthClient = new FusionAuthClient(
     process.env.FUSIONAUTH_API_KEY!, // API Key (use ! for non-null assertion as dotenv might not guarantee it)
-    process.env.FUSIONAUTH_URL!      // FusionAuth instance URL
+    process.env.FUSIONAUTH_URL!,      // FusionAuth instance URL
+    process.env.FUSIONAUTH_TENANT_ID // Optional: Tenant ID if using multi-tenancy
 );
 
-// Example MCP endpoint that calls FusionAuth for user registration
-app.post('/mcp/register-user', async (req: Request, res: Response) => {
-    const { email, password, firstName, lastName } = req.body;
+const ai = genkit({
+    plugins: [googleAI()],
+    model: googleAI.model(MODEL),
+});
 
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required for registration.' });
-    }
+/** User Input Model */
 
-    try {
-        const registrationRequest = {
-            user: {
-                email: email,
-                password: password,
-                firstName: firstName,
-                lastName: lastName,
-            },
-            registrations: [ // FusionAuth often expects an array of registrations
-                {
-                    applicationId: process.env.FUSIONAUTH_APPLICATION_ID!, // Your FusionAuth Application ID
-                    // other registration details if needed, e.g., verified: true
+const userInput = z.object({
+    email: z.string().email('Invalid email format.').describe('The email address of the new user.'),
+    password: z.string().min(8, 'Password must be at least 8 characters long.').describe('The password for the new user.'),
+    fullName: z.string().optional().describe('The optional full name of the user.'),
+});
+
+
+/**
+ * Genkit tool to create a new user in FusionAuth.
+ * This tool wraps the `createUser` method of our mock FusionAuth client.
+ */
+ai.defineTool(
+    {
+        name: 'fusionauth/createUser',
+        description: 'Creates a new user in FusionAuth with the provided email, password, and optional full name.',
+        inputSchema: userInput,
+        outputSchema: z.object({
+            userId: z.string().describe('The unique ID of the newly created user.'),
+            email: z.string().email().describe('The email of the newly created user.'),
+        }),
+    },
+    async (input) => {
+        try {
+            const result = await fusionAuthClient.createUser('', {
+                applicationId: process.env.FUSIONAUTH_APPLICATION_ID, // Ensure you set this in your .env file,
+                user: {
+                    email: input.email,
+                    password: input.password,
+                    fullName: input.fullName,
                 }
-            ]
-        };
-
-        // Make the call to FusionAuth using the official client
-        // Note: The method name and payload structure might differ slightly from the generated one.
-        // The official client typically has methods like .register, .login, etc.
-        const clientResponse = await fusionAuthClient.register('', registrationRequest);
-
-        if (clientResponse.statusCode === 200) {
-            console.log('User registered successfully:', clientResponse.response.user?.id);
-            return res.status(200).json({
-                mcpStatus: 'SUCCESS',
-                userId: clientResponse.response.user?.id,
-                message: 'User registered via MCP',
             });
-        } else {
-            console.error('Failed to register user:', clientResponse.statusCode, clientResponse.errorResponse);
-            return res.status(clientResponse.statusCode || 500).json({
-                mcpStatus: 'ERROR',
-                message: 'Failed to register user (FusionAuth returned error)',
-                fusionAuthErrors: clientResponse.errorResponse,
-            });
+            if (result.statusCode !== 200) {
+                throw new Error(`Failed to create user: ${result.exception}`);
+            }
+            const user = result.response.user;
+            if (!user || !user.id || !user.email) {
+                throw new Error('User creation response did not contain correct user data.');
+            }
+            return {
+                userId: user.id,
+                email: user.email,
+            }
+        } catch (error: any) {
+            console.error('Error creating user:', error);
+            throw new Error(`Failed to create user: ${JSON.stringify(error) || 'Unknown error'}`);
+        }
+    }
+);
+
+ai.definePrompt({
+    name: 'createSingleUser',
+    description: 'Creates a new user in FusionAuth with the provided email, password, and optional full name.',
+    model: MODEL,
+    input: {
+        schema: userInput
+    },
+    prompt: 'Create a new user with the following details: Email: {{email}}, Password: {{password}}, Name: {{fullName}}',
+    tools: ['fusionauth/createUser'],
+    toolChoice: 'required',
+});
+
+export const multipleUserCreationFlow = ai.defineFlow(
+    {
+        name: 'multipleUserCreationFlow',
+        inputSchema: z.object({
+            numberOfUsers: z.number().min(1, 'You must create at least one user.').describe('The number of users to create.'),
+        }),
+        outputSchema: z.array(userInput).describe('An array of example user objects.'),
+    },
+    async ({ numberOfUsers }) => {
+        const response = await ai.generate({
+            model: MODEL,
+            prompt: `Create ${numberOfUsers} new users with random universally unique emails, passwords, and names.`,
+            output: {
+                schema: z.array(z.object({
+                    email: z.string(),
+                    password: z.string(),
+                    name: z.string(),
+                })),
+            },
+        });
+
+        if (!response || !response.output || !Array.isArray(response.output)) {
+            throw new Error('Invalid response from AI model. Expected an array of user objects.');
         }
 
-    } catch (error: any) {
-        console.error('Unexpected error registering user with FusionAuth:', error.message);
-        return res.status(500).json({
-            mcpStatus: 'ERROR',
-            message: 'Failed to process user registration via MCP',
-            details: error.message,
-        });
-    }
-});
+        // Access prompt for creating users
+        const createUser = ai.prompt('createSingleUser');
 
-// Example MCP endpoint for user authentication (login)
-app.post('/mcp/authenticate-user', async (req: Request, res: Response) => {
-    const { loginId, password, applicationId } = req.body;
-
-    if (!loginId || !password || !applicationId) {
-        return res.status(400).json({ message: 'loginId, password, and applicationId are required for authentication.' });
-    }
-
-    try {
-        const loginRequest = {
-            loginId: loginId,
-            password: password,
-            applicationId: applicationId,
-        };
-
-        const clientResponse = await fusionAuthClient.login(loginRequest);
-
-        if (clientResponse.statusCode === 200) {
-            console.log('User authenticated successfully. JWT issued.');
-            return res.status(200).json({
-                mcpStatus: 'SUCCESS',
-                accessToken: clientResponse.response.token,
-                refreshToken: clientResponse.response.refreshToken,
-                user: clientResponse.response.user,
-                message: 'User authenticated via MCP'
-            });
-        } else {
-            console.error('Authentication failed:', clientResponse.statusCode, clientResponse.errorResponse);
-            return res.status(clientResponse.statusCode || 401).json({
-                mcpStatus: 'ERROR',
-                message: 'Authentication failed via MCP',
-                fusionAuthErrors: clientResponse.errorResponse,
-            });
+        // Create each user using the FusionAuth tool.
+        const users = [];
+        for (const user of response.output) {
+            const response = await createUser(user);
+            users.push(response.output)
         }
+        return users;
+    },
+);
 
-    } catch (error: any) {
-        console.error('Unexpected error authenticating user with FusionAuth:', error.message);
-        return res.status(500).json({
-            mcpStatus: 'ERROR',
-            message: 'Failed to process user authentication via MCP',
-            details: error.message,
-        });
+/**
+ * Genkit tool to create a new user in FusionAuth.
+ * This tool wraps the `createUser` method of our mock FusionAuth client.
+ */
+ai.defineTool(
+    {
+        name: 'fusionauth/createUser',
+        description: 'Creates a new user in FusionAuth with the provided email, password, and optional full name.',
+        inputSchema: userInput,
+        outputSchema: z.object({
+            userId: z.string().describe('The unique ID of the newly created user.'),
+            email: z.string().email().describe('The email of the newly created user.'),
+        }),
+    },
+    async (input) => {
+        try {
+            const result = await fusionAuthClient.createUser('', {
+                applicationId: process.env.FUSIONAUTH_APPLICATION_ID, // Ensure you set this in your .env file,
+                user: {
+                    email: input.email,
+                    password: input.password,
+                    fullName: input.fullName,
+                }
+            });
+            if (result.statusCode !== 200) {
+                throw new Error(`Failed to create user: ${result.exception}`);
+            }
+            const user = result.response.user;
+            if (!user || !user.id || !user.email) {
+                throw new Error('User creation response did not contain correct user data.');
+            }
+            return {
+                userId: user.id,
+                email: user.email,
+            }
+        } catch (error: any) {
+            console.error('Error creating user:', error);
+            throw new Error(`Failed to create user: ${JSON.stringify(error) || 'Unknown error'}`);
+        }
     }
-});
+);
+
+// --- Start the MCP Server ---
+// This exposes the defined Genkit tools as an MCP server.
+mcpServer(ai, {
+    name: 'fusionauth-genkit-mcp-server',
+    version: '1.0.0',
+}).start();
 
 
-// Add more MCP endpoints here, mapping to various FusionAuth calls.
-// The official client provides methods corresponding to the FusionAuth API endpoints,
-// for example:
-// - fusionAuthClient.retrieveUser(userId)
-// - fusionAuthClient.updateUser(userId, { user: { ... } })
-// - fusionAuthClient.changePassword(changePasswordRequest)
-// - fusionAuthClient.validateJWT(token)
-
-// Basic health check endpoint
-app.get('/', (req: Request, res: Response) => {
-    res.send('FusionAuth MCP Server is running!');
-});
-
-app.listen(port, () => {
-    console.log(`FusionAuth MCP server listening on port ${port} ${DEV ? '(Development Mode)' : ''}`);
-});
+// console.log('Genkit MCP Server for FusionAuth tools is running...');
+// console.log('You can test it using the MCP Inspector: npx @modelcontextprotocol/inspector dist/index.js');
