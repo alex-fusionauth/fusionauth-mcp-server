@@ -1,6 +1,3 @@
-import express from 'express';
-import type { Request, Response } from 'express';
-
 import { genkit, z } from 'genkit';
 import { mcpServer } from 'genkitx-mcp';
 import { config } from 'dotenv';
@@ -33,20 +30,22 @@ const userInput = z.object({
     fullName: z.string().optional().describe('The optional full name of the user.'),
 });
 
+const userOutput = z.object({
+    email: z.string().email('Invalid email format.').describe('The email address of the new user.'),
+    id: z.string().describe('The ID of the user in FusionAuth.'),
+});
+
 
 /**
  * Genkit tool to create a new user in FusionAuth.
  * This tool wraps the `createUser` method of our mock FusionAuth client.
  */
-ai.defineTool(
+const userCreateTool = ai.defineTool(
     {
         name: 'fusionauth/createUser',
         description: 'Creates a new user in FusionAuth with the provided email, password, and optional full name.',
         inputSchema: userInput,
-        outputSchema: z.object({
-            userId: z.string().describe('The unique ID of the newly created user.'),
-            email: z.string().email().describe('The email of the newly created user.'),
-        }),
+        outputSchema: userOutput,
     },
     async (input) => {
         try {
@@ -66,7 +65,7 @@ ai.defineTool(
                 throw new Error('User creation response did not contain correct user data.');
             }
             return {
-                userId: user.id,
+                id: user.id,
                 email: user.email,
             }
         } catch (error: any) {
@@ -94,7 +93,7 @@ export const multipleUserCreationFlow = ai.defineFlow(
         inputSchema: z.object({
             numberOfUsers: z.number().min(1, 'You must create at least one user.').describe('The number of users to create.'),
         }),
-        outputSchema: z.array(userInput).describe('An array of example user objects.'),
+        outputSchema: z.array(userOutput).describe('An array of user objects.'),
     },
     async ({ numberOfUsers }) => {
         const response = await ai.generate({
@@ -113,14 +112,24 @@ export const multipleUserCreationFlow = ai.defineFlow(
             throw new Error('Invalid response from AI model. Expected an array of user objects.');
         }
 
-        // Access prompt for creating users
-        const createUser = ai.prompt('createSingleUser');
+        /* Prompts seem to duplicate */
+        // // Access prompt for creating users
+        // const createUser = ai.prompt('createSingleUser');
+
+        // // Create each user using the FusionAuth tool.
+        // const users = [];
+        // for (const user of response.output) {
+        //     const response = await createUser(user);
+        //     users.push(response.output)
+        // }
+        // return users;
+
 
         // Create each user using the FusionAuth tool.
         const users = [];
         for (const user of response.output) {
-            const response = await createUser(user);
-            users.push(response.output)
+            const faUser = await userCreateTool(user);
+            users.push(faUser)
         }
         return users;
     },
@@ -174,7 +183,3 @@ mcpServer(ai, {
     name: 'fusionauth-genkit-mcp-server',
     version: '1.0.0',
 }).start();
-
-
-// console.log('Genkit MCP Server for FusionAuth tools is running...');
-// console.log('You can test it using the MCP Inspector: npx @modelcontextprotocol/inspector dist/index.js');
