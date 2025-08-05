@@ -1,0 +1,137 @@
+{
+  "variables": {
+    "defaultTenantId": "d7d09513-a3f5-401c-9685-34ab6c552453",
+    "adminEmail": "admin@example.com",
+    "adminPassword": "password",
+    "applicationName": "MCP Tools Example",
+    "apiKey": "bf69486b-4733-4470-a592-f1bfce7af580"
+  },
+  "apiKeys": [
+    {
+      "key": "#{apiKey}",
+      "description": "MCP Tools API Key",
+      "permissions": {
+        "endpoints": {
+          "/api/application": ["POST", "GET", "PUT", "PATCH", "DELETE"],
+          "/api/application/*": ["POST", "GET", "PUT", "PATCH", "DELETE"],
+          "/api/user": ["POST", "GET", "PUT", "PATCH", "DELETE"],
+          "/api/user/*": ["POST", "GET", "PUT", "PATCH", "DELETE"],
+          "/api/user/search": ["POST"],
+          "/api/group": ["POST", "GET", "PUT", "PATCH", "DELETE"],
+          "/api/group/*": ["POST", "GET", "PUT", "PATCH", "DELETE"],
+          "/api/tenant": ["POST", "GET", "PUT", "PATCH", "DELETE"]
+        }
+      }
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "url": "/api/user",
+      "body": {
+        "user": {
+          "email": "#{adminEmail}",
+          "password": "#{adminPassword}",
+          "firstName": "Admin",
+          "lastName": "User",
+          "data": {
+            "role": "admin"
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/application/#{FUSIONAUTH_APPLICATION_ID}",
+      "body": {
+        "application": {
+          "name": "#{applicationName}",
+          "roles": [
+            {
+              "name": "admin",
+              "description": "Administrator role",
+              "isDefault": false,
+              "isSuperRole": false
+            },
+            {
+              "name": "user",
+              "description": "Standard user role",
+              "isDefault": true,
+              "isSuperRole": false
+            }
+          ],
+          "oauthConfiguration": {
+            "authorizedRedirectURLs": [
+              "http://localhost:3001/api/auth/callback/fusionauth",
+              "http://localhost:3002/auth/callback"
+            ],
+            "clientSecret": "super-secret-secret-that-should-be-regenerated-for-production",
+            "enabledGrants": [
+              "authorization_code",
+              "refresh_token"
+            ],
+            "generateRefreshTokens": true,
+            "logoutURL": "http://localhost:3001",
+            "requireClientAuthentication": true
+          },
+          "jwtConfiguration": {
+            "enabled": true,
+            "accessTokenKeyId": "#{FUSIONAUTH_APPLICATION_ID}",
+            "idTokenKeyId": "#{FUSIONAUTH_APPLICATION_ID}"
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/user",
+      "body": {
+        "user": {
+          "email": "user@example.com",
+          "password": "password",
+          "firstName": "Test",
+          "lastName": "User",
+          "username": "testuser"
+        },
+        "registration": {
+          "applicationId": "#{FUSIONAUTH_APPLICATION_ID}",
+          "roles": ["user"]
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/user",
+      "body": {
+        "user": {
+          "email": "jane.doe@example.com",
+          "password": "password",
+          "firstName": "Jane",
+          "lastName": "Doe",
+          "username": "janedoe"
+        },
+        "registration": {
+          "applicationId": "#{FUSIONAUTH_APPLICATION_ID}",
+          "roles": ["user"]
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/user",
+      "body": {
+        "user": {
+          "email": "john.smith@example.com",
+          "password": "password",
+          "firstName": "John",
+          "lastName": "Smith",
+          "username": "johnsmith"
+        },
+        "registration": {
+          "applicationId": "#{FUSIONAUTH_APPLICATION_ID}",
+          "roles": ["admin"]
+        }
+      }
+    }
+  ]
+}
