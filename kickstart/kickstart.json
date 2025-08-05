@@ -91,21 +91,6 @@
     },
     {
       "method": "POST",
-      "url": "/api/user",
-      "body": {
-        "user": {
-          "email": "#{adminEmail}",
-          "password": "#{adminPassword}",
-          "firstName": "Admin",
-          "lastName": "User",
-          "data": {
-            "role": "admin"
-          }
-        }
-      }
-    },
-    {
-      "method": "POST",
       "url": "/api/user/registration/#{adminUserId}",
       "body": {
         "registration": {

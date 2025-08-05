@@ -10,13 +10,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const result = await fusionAuth.searchUsers(body);
-    
     if (result.success) {
       return NextResponse.json(result.data);
     } else {
       return NextResponse.json(
         { error: result.error },
-        { status: 400 }
+        { status: result.statusCode || 400 }
       );
     }
   } catch (error) {

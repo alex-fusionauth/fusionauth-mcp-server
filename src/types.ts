@@ -1,10 +1,10 @@
-import type { 
-  User, 
-  Application, 
-  Group, 
+import type {
+  User,
+  Application,
+  Group,
   UserRegistration,
   LoginRequest,
-  SearchRequest 
+  SearchRequest
 } from '@fusionauth/typescript-client';
 
 export interface FusionAuthConfig {
@@ -57,4 +57,6 @@ export interface FusionAuthToolResult {
   success: boolean;
   data?: any;
   error?: string;
+  statusCode?: number;
+  raw?: any;
 }

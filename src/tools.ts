@@ -28,22 +28,18 @@ export class FusionAuthTools {
           data: params.data,
         }
       });
-
-      if (response.wasSuccessful()) {
-        return {
-          success: true,
-          data: response.response.user,
-        };
-      } else {
-        return {
-          success: false,
-          error: response.exception?.message || 'Failed to create user',
-        };
-      }
-    } catch (error) {
+      return {
+        success: response.wasSuccessful(),
+        statusCode: response.statusCode,
+        data: response.response?.user,
+        raw: response
+      };
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: error?.statusCode,
+        error: error?.message || error?.toString() || 'Unknown error',
+        raw: error
       };
     }
   }
@@ -51,7 +47,6 @@ export class FusionAuthTools {
   async getUser(userId?: string, email?: string): Promise<FusionAuthToolResult> {
     try {
       let response;
-
       if (userId) {
         response = await this.client.retrieveUser(userId);
       } else if (email) {
@@ -62,22 +57,18 @@ export class FusionAuthTools {
           error: 'Either userId or email must be provided',
         };
       }
-
-      if (response.wasSuccessful()) {
-        return {
-          success: true,
-          data: response.response.user,
-        };
-      } else {
-        return {
-          success: false,
-          error: response.exception?.message || 'Failed to retrieve user',
-        };
-      }
-    } catch (error) {
+      return {
+        success: response.wasSuccessful(),
+        statusCode: response.statusCode,
+        data: response.response?.user,
+        raw: response
+      };
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: error?.statusCode,
+        error: error?.message || error?.toString() || 'Unknown error',
+        raw: error
       };
     }
   }
@@ -95,25 +86,21 @@ export class FusionAuthTools {
           })),
         },
       });
-
-      if (response.wasSuccessful()) {
-        return {
-          success: true,
-          data: {
-            users: response.response.users,
-            total: response.response.total,
-          },
-        };
-      } else {
-        return {
-          success: false,
-          error: response.exception?.message || 'Failed to search users',
-        };
-      }
-    } catch (error) {
+      return {
+        success: response.wasSuccessful(),
+        statusCode: response.statusCode,
+        data: {
+          users: response.response?.users,
+          total: response.response?.total,
+        },
+        raw: response
+      };
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: error?.statusCode,
+        error: error?.message || error?.toString() || 'Unknown error',
+        raw: error
       };
     }
   }
@@ -123,22 +110,18 @@ export class FusionAuthTools {
       const response = await this.client.updateUser(params.userId, {
         user: params.user,
       });
-
-      if (response.wasSuccessful()) {
-        return {
-          success: true,
-          data: response.response.user,
-        };
-      } else {
-        return {
-          success: false,
-          error: response.exception?.message || 'Failed to update user',
-        };
-      }
-    } catch (error) {
+      return {
+        success: response.wasSuccessful(),
+        statusCode: response.statusCode,
+        data: response.response?.user,
+        raw: response
+      };
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: error?.statusCode,
+        error: error?.message || error?.toString() || 'Unknown error',
+        raw: error
       };
     }
   }
@@ -146,22 +129,18 @@ export class FusionAuthTools {
   async deleteUser(params: DeleteUserParams): Promise<FusionAuthToolResult> {
     try {
       const response = await this.client.deleteUser(params.userId);
-
-      if (response.wasSuccessful()) {
-        return {
-          success: true,
-          data: { deleted: true },
-        };
-      } else {
-        return {
-          success: false,
-          error: response.exception?.message || 'Failed to delete user',
-        };
-      }
-    } catch (error) {
+      return {
+        success: response.wasSuccessful(),
+        statusCode: response.statusCode,
+        data: response.response,
+        raw: response
+      };
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: error?.statusCode,
+        error: error?.message || error?.toString() || 'Unknown error',
+        raw: error
       };
     }
   }
@@ -176,22 +155,18 @@ export class FusionAuthTools {
           jwtConfiguration: params.jwtConfiguration,
         },
       });
-
-      if (response.wasSuccessful()) {
-        return {
-          success: true,
-          data: response.response.application,
-        };
-      } else {
-        return {
-          success: false,
-          error: response.exception?.message || 'Failed to create application',
-        };
-      }
-    } catch (error) {
+      return {
+        success: response.wasSuccessful(),
+        statusCode: response.statusCode,
+        data: response.response?.application,
+        raw: response
+      };
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: error?.statusCode,
+        error: error?.message || error?.toString() || 'Unknown error',
+        raw: error
       };
     }
   }
@@ -199,22 +174,18 @@ export class FusionAuthTools {
   async getApplications(): Promise<FusionAuthToolResult> {
     try {
       const response = await this.client.retrieveApplications();
-
-      if (response.wasSuccessful()) {
-        return {
-          success: true,
-          data: response.response.applications,
-        };
-      } else {
-        return {
-          success: false,
-          error: response.exception?.message || 'Failed to retrieve applications',
-        };
-      }
-    } catch (error) {
+      return {
+        success: response.wasSuccessful(),
+        statusCode: response.statusCode,
+        data: response.response?.applications,
+        raw: response
+      };
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: error?.statusCode,
+        error: error?.message || error?.toString() || 'Unknown error',
+        raw: error
       };
     }
   }
