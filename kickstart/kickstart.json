@@ -3,28 +3,92 @@
     "defaultTenantId": "d7d09513-a3f5-401c-9685-34ab6c552453",
     "adminEmail": "admin@example.com",
     "adminPassword": "password",
+    "adminUserId": "00000000-0000-0000-0000-000000000001",
     "applicationName": "MCP Tools Example",
-    "apiKey": "bf69486b-4733-4470-a592-f1bfce7af580"
+    "applicationId": "e9fdb985-9173-4e01-9d73-ac2d60d1dc8e",
+    "adminApiKey": "bf69486b-4733-4470-a592-f1bfce7admin",
+    "apiKey": "bf69486b-4733-4470-a592-f1bfce7af580",
+    "asymmetricKeyId": "#{UUID()}"
   },
   "apiKeys": [
+    {
+      "key": "#{adminApiKey}",
+      "description": "Unrestricted API key"
+    },
     {
       "key": "#{apiKey}",
       "description": "MCP Tools API Key",
       "permissions": {
         "endpoints": {
-          "/api/application": ["POST", "GET", "PUT", "PATCH", "DELETE"],
-          "/api/application/*": ["POST", "GET", "PUT", "PATCH", "DELETE"],
-          "/api/user": ["POST", "GET", "PUT", "PATCH", "DELETE"],
-          "/api/user/*": ["POST", "GET", "PUT", "PATCH", "DELETE"],
-          "/api/user/search": ["POST"],
-          "/api/group": ["POST", "GET", "PUT", "PATCH", "DELETE"],
-          "/api/group/*": ["POST", "GET", "PUT", "PATCH", "DELETE"],
-          "/api/tenant": ["POST", "GET", "PUT", "PATCH", "DELETE"]
+          "/api/application": [
+            "POST",
+            "GET",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "/api/application/*": [
+            "POST",
+            "GET",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "/api/user": [
+            "POST",
+            "GET",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "/api/user/*": [
+            "POST",
+            "GET",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "/api/user/search": [
+            "POST"
+          ],
+          "/api/group": [
+            "POST",
+            "GET",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "/api/group/*": [
+            "POST",
+            "GET",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "/api/tenant": [
+            "POST",
+            "GET",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
         }
       }
     }
   ],
   "requests": [
+    {
+      "method": "POST",
+      "url": "/api/key/generate/#{asymmetricKeyId}",
+      "tenantId": "#{defaultTenantId}",
+      "body": {
+        "key": {
+          "algorithm": "RS256",
+          "name": "For example apps",
+          "length": 2048
+        }
+      }
+    },
     {
       "method": "POST",
       "url": "/api/user",
@@ -42,7 +106,30 @@
     },
     {
       "method": "POST",
-      "url": "/api/application/#{FUSIONAUTH_APPLICATION_ID}",
+      "url": "/api/user/registration/#{adminUserId}",
+      "body": {
+        "registration": {
+          "applicationId": "#{FUSIONAUTH_APPLICATION_ID}",
+          "roles": [
+            "admin"
+          ]
+        },
+        "roles": [
+          "admin"
+        ],
+        "skipRegistrationVerification": true,
+        "user": {
+          "birthDate": "1981-06-04",
+          "email": "#{adminEmail}",
+          "firstName": "Admin",
+          "lastName": "UI",
+          "password": "#{adminPassword}"
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/application/#{applicationId}",
       "body": {
         "application": {
           "name": "#{applicationName}",
@@ -76,8 +163,8 @@
           },
           "jwtConfiguration": {
             "enabled": true,
-            "accessTokenKeyId": "#{FUSIONAUTH_APPLICATION_ID}",
-            "idTokenKeyId": "#{FUSIONAUTH_APPLICATION_ID}"
+            "accessTokenKeyId": "#{asymmetricKeyId}",
+            "idTokenKeyId": "#{asymmetricKeyId}"
           }
         }
       }
@@ -94,8 +181,10 @@
           "username": "testuser"
         },
         "registration": {
-          "applicationId": "#{FUSIONAUTH_APPLICATION_ID}",
-          "roles": ["user"]
+          "applicationId": "#{applicationId}",
+          "roles": [
+            "user"
+          ]
         }
       }
     },
@@ -111,8 +200,10 @@
           "username": "janedoe"
         },
         "registration": {
-          "applicationId": "#{FUSIONAUTH_APPLICATION_ID}",
-          "roles": ["user"]
+          "applicationId": "#{applicationId}",
+          "roles": [
+            "user"
+          ]
         }
       }
     },
@@ -128,8 +219,10 @@
           "username": "johnsmith"
         },
         "registration": {
-          "applicationId": "#{FUSIONAUTH_APPLICATION_ID}",
-          "roles": ["admin"]
+          "applicationId": "#{applicationId}",
+          "roles": [
+            "admin"
+          ]
         }
       }
     }
