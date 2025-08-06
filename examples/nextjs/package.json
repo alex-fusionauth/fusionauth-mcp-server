@@ -1,5 +1,5 @@
 {
-  "name": "fusionauth-mcp-nextjs-example",
+  "name": "fusionauth-example-mcp-nextjs",
   "version": "0.1.0",
   "private": true,
   "scripts": {

@@ -1,3 +1,28 @@
+# MCP Tools - Express.js Integration
+
+Express.js utilities for building MCP servers with authentication support. These tools make it easy to add MCP (Model Context Protocol) endpoints to your existing Express applications.
+
+## Installation
+
+Make sure you have the required dependencies installed:
+
+```bash
+npm install @fusionauth/mcp-tools express @modelcontextprotocol/sdk
+```
+
+If you're using FusionAuth for authentication, also install the FusionAuth express SDK:
+
+```bash
+npm install @fusionauth/typescript-client
+```
+
+## Quick Start
+
+### Example with FusionAuth Authentication
+
+Here's a complete example using FusionAuth for authentication:s
+
+```ts
 import "dotenv/config";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -58,3 +83,4 @@ app.get(
 app.post("/mcp", mcpAuthFusionAuth, streamableHttpHandler(server));
 
 app.listen(3000);
+```

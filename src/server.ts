@@ -84,6 +84,7 @@ export function fetchFusionAuthAuthorizationServerMetadata({
     });
 }
 
+//TODO: Don't love this check, should we use a library?
 /**
  * Verifies a FusionAuth token and returns data in the format expected to be passed
  * as `authData to the MCP SDK. In TypeScript, this is the validateJWT function return type.
