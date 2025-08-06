@@ -9,6 +9,7 @@ import {
   protectedResourceHandlerFusionAuth,
   authServerMetadataHandlerFusionAuth,
   streamableHttpHandler,
+  protectedResourceHandler
 } from "../../../src/express";
 
 const app = express();
@@ -50,7 +51,8 @@ server.tool(
   }
 );
 
-app.get("/.well-known/oauth-protected-resource", protectedResourceHandlerFusionAuth);
+app.get("/.well-known/oauth-protected-resource", protectedResourceHandler);
+app.get("/.well-known/oauth-protected-resource-fusionauth", protectedResourceHandlerFusionAuth);
 app.get(
   "/.well-known/oauth-authorization-server",
   authServerMetadataHandlerFusionAuth
