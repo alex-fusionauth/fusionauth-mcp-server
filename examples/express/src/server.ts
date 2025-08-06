@@ -9,7 +9,7 @@ import {
   protectedResourceHandlerFusionAuth,
   authServerMetadataHandlerFusionAuth,
   streamableHttpHandler,
-} from "@fusionauth/mcp-tools/express";
+} from "../../../src/express";
 
 const app = express();
 

@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
+    "allowJs": true,
     "target": "ES2022",
     "module": "NodeNext",
     "lib": [
       "ES2022"
     ],
     "outDir": "./dist",
-    "rootDir": "./src",
+    // "rootDir": "./src", // Allow imports from outside src
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,7 +15,7 @@
     "declaration": true,
     "sourceMap": true,
     "resolveJsonModule": true,
-    "moduleResolution": "bundler"
+    "moduleResolution": "nodenext"
   },
   "include": [
     "src/**/*"

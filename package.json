@@ -24,28 +24,32 @@
   "author": "Alex Patterson (codercatdev)",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "dist/",
+  "main": "dist/index.js",
   "files": [
     "dist",
     "README.md",
     "LICENSE"
   ],
   "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
     "./client": {
-      "import": "./dist/client.js",
-      "types": "./dist/client.d.ts"
+      "import": "./dist/src/client.js",
+      "types": "./dist/src/client.d.ts"
     },
     "./server": {
-      "import": "./dist/server.js",
-      "types": "./dist/server.d.ts"
+      "import": "./dist/src/server.js",
+      "types": "./dist/src/server.d.ts"
     },
     "./next": {
-      "import": "./dist/next/index.js",
-      "types": "./dist/next/index.d.ts"
+      "import": "./dist/src/next/index.js",
+      "types": "./dist/src/next/index.d.ts"
     },
     "./express": {
-      "import": "./dist/express/index.js",
-      "types": "./dist/express/index.d.ts"
+      "import": "./dist/src/express/index.js",
+      "types": "./dist/src/express/index.d.ts"
     },
     "./stores": "./dist/stores",
     "./stores/fs": {
@@ -67,7 +71,6 @@
   },
   "scripts": {
     "build": "tsup",
-    "postbuild": "mv dist/src/* dist/ && rm -rf dist/src",
     "prepublishOnly": "npm run build",
     "watch": "tsup --watch",
     "lint": "eslint src/**/*.ts",
@@ -81,7 +84,9 @@
     "docker:rebuild": "docker-compose down && docker-compose up -d --build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "node-fetch": "^3",
+    "punycode": "^2.3.1"
   },
   "devDependencies": {
     "@fusionauth/typescript-client": "^1.53.0",
