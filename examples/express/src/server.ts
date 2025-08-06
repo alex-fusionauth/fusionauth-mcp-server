@@ -10,7 +10,7 @@ import {
   authServerMetadataHandlerFusionAuth,
   streamableHttpHandler,
   protectedResourceHandler
-} from "../../../src/express";
+} from "@fusionauth/mcp-tools/express";
 
 const app = express();
 
@@ -63,7 +63,7 @@ app.get(
   "/.well-known/oauth-authorization-server",
   authServerMetadataHandlerFusionAuth
 );
-app.post("/mcp", mcpAuthFusionAuth, streamableHttpHandler(server));
+// app.post("/mcp", mcpAuthFusionAuth, streamableHttpHandler(server));
 
 
 // Error-handling middleware (must be last)

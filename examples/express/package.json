@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Express example for FusionAuth MCP tools",
   "main": "dist/server.js",
+  "type": "module",
   "scripts": {
     "dev": "tsx src/server.ts",
     "build": "tsc",
