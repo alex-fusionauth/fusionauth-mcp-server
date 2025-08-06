@@ -1,3 +1,9 @@
+// Utility to wrap async Express handlers and pass errors to next()
+export function asyncMiddleware(fn: any) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
 import { FusionAuthClient } from '@fusionauth/typescript-client';
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -96,28 +102,27 @@ export async function mcpAuthFusionAuth(
   res: express.Response,
   next: express.NextFunction
 ): Promise<void> {
-  (
-    await mcpAuth(async (token, req: express.Request) => {
-      //Get https cookie, typically app.at
-      const cookies = req.headers.cookie;
-      const tokenCookie = cookies
-        ?.split(";")
-        .map((c) => c.trim())
-        .find((c) => c.startsWith("app.at="));
+  //Get https cookie, typically app.at
+  const cookies = req.headers.cookie;
+  const tokenCookie = cookies
+    ?.split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith("app.at="));
 
-      if (!tokenCookie) return undefined;
+  if (!tokenCookie) return undefined;
 
-      const accessToken = tokenCookie.split("=")[1];
-      const jwtResp = await verifyAccessToken(accessToken);
+  const accessToken = tokenCookie.split("=")[1];
+  const jwtResp = await verifyAccessToken(accessToken);
 
-      if (!jwtResp || !jwtResp.wasSuccessful() || !jwtResp.response.jwt) {
-        console.error("Invalid OAuth access token");
-        return undefined;
-      }
+  if (!jwtResp || !jwtResp.wasSuccessful() || !jwtResp.response.jwt) {
+    console.error("Invalid OAuth access token");
+    return undefined;
+  }
 
-      return verifyFusionAuthToken(jwtResp.response.jwt, token);
-    })
-  )(req, res, next);
+
+  //TODO: Seems unneeded, but keeping for now
+  const verified = verifyFusionAuthToken(jwtResp.response.jwt, accessToken);
+  next();
 }
 
 /**
@@ -145,28 +150,41 @@ export function protectedResourceHandler({
   authServerUrl: string;
   properties?: Record<string, unknown>;
 }) {
-  return async (req: express.Request, res: express.Response) => {
+  return asyncMiddleware(async (req: express.Request, res: express.Response) => {
     const metadata = generateProtectedResourceMetadata({
       authServerUrl,
       resourceUrl: getResourceUrl(req),
       properties,
     });
-
     res.json(metadata);
-  };
-}
-
-export async function authServerMetadataHandlerFusionAuth(
-  _: express.Request,
-  res: express.Response
-) {
-
-  const metadata = await fetchFusionAuthAuthorizationServerMetadata({
-    authServerUrl: process.env.FUSIONAUTH_BASE_URL || 'http://localhost:9011'
   });
-
-  return res.json(metadata);
 }
+
+export const authServerMetadataHandlerFusionAuth = asyncMiddleware(async (
+  _: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  try {
+    const baseUrl = process.env.FUSIONAUTH_BASE_URL;
+    if (!baseUrl || !/^https?:\/\//.test(baseUrl)) {
+      throw new Error('FUSIONAUTH_BASE_URL is missing or invalid. Please set it to a valid URL.');
+    }
+    const metadata = await fetchFusionAuthAuthorizationServerMetadata({
+      authServerUrl: baseUrl
+    });
+    if (!metadata || typeof metadata !== 'object') {
+      throw new Error('FusionAuth did not return valid JSON metadata');
+    }
+    return res.json(metadata);
+  } catch (err: any) {
+    // If the error is a SyntaxError, likely got HTML instead of JSON
+    if (err instanceof SyntaxError || (err.message && err.message.includes('Unexpected token'))) {
+      return res.status(502).json({ error: 'FusionAuth returned invalid JSON. Is the server running and reachable?', details: err.message });
+    }
+    next(err);
+  }
+});
 
 /**
  * An express handler that will return OAuth protected resource metadata if you're using FusionAuth.
@@ -182,15 +200,14 @@ export async function authServerMetadataHandlerFusionAuth(
 export function protectedResourceHandlerFusionAuth(
   properties?: Record<string, unknown>
 ) {
-  return (req: express.Request, res: express.Response) => {
+  return asyncMiddleware(async (req: express.Request, res: express.Response) => {
     const metadata = generateFusionAuthProtectedResourceMetadata({
       authServerUrl: process.env.FUSIONAUTH_BASE_URL || 'http://localhost:9011',
       resourceUrl: getResourceUrl(req),
       properties,
     });
-
     res.json(metadata);
-  };
+  });
 }
 
 // Given a protected resource metadata url generate the url of the original

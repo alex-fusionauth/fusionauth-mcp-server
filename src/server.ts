@@ -77,7 +77,15 @@ export function fetchFusionAuthAuthorizationServerMetadata({
   authServerUrl: string;
 }) {
 
-  return fetch(`${authServerUrl}/.well-known/oauth-authorization-server`)
+  /*
+  * FusionAuth currently does not provide a dedicated .well-known/oauth-authorization-server endpoint as defined by RFC 8414. 
+  https://github.com/FusionAuth/fusionauth-issues/issues/1029
+  
+  However, there is an open feature request to support this endpoint, and the recommended approach is to use the existing .well-known/openid-configuration endpoint for OAuth 2.0 metadata discovery. According to the OAuth 2.0 Authorization Server Metadata specification, it is acceptable for OAuth applications to use the /.well-known/openid-configuration URI suffix for general OAuth 2.0 features, even if it appears OpenID-specific Support OAuth2 metadata RFC (RFC 8414).
+  Therefore, if you need OAuth 2.0 metadata from FusionAuth, you should use the /.well-known/openid-configuration endpoint, which provides the necessary information for both OpenID Connect and OAuth 2.0 clients OpenID Configuration.
+  If you require the .well-known/oauth-authorization-server endpoint specifically, you may need to monitor the progress of the related feature request or consider a workaround, such as serving the same content at both endpoints if you control a proxy in front of FusionAuth. Currently, FusionAuth does not natively support this endpoint.
+  */
+  return fetch(`${authServerUrl}/.well-known/openid-configuration`)
     .then((res) => res.json())
     .then((metadata) => {
       return metadata;
