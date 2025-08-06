@@ -1,347 +1,143 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
-} from '@modelcontextprotocol/sdk/types.js';
-import { FusionAuthTools } from './tools.js';
-import {
-  CreateUserSchema,
-  SearchUsersSchema,
-  UpdateUserSchema,
-  DeleteUserSchema,
-  CreateApplicationSchema,
-  GetUserSchema,
-} from './schemas.js';
-import type { FusionAuthConfig } from './types.js';
+import type { JWT } from "@fusionauth/typescript-client";
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 
-export class FusionAuthMCPServer {
-  private server: Server;
-  private fusionAuth: FusionAuthTools;
-
-  constructor(config: FusionAuthConfig) {
-    this.server = new Server(
-      {
-        name: 'fusionauth-mcp-server',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
+/**
+ * Generates protected resource metadata for the given auth server url and
+ * resource server url.
+ *
+ * @param authServerUrl - URL of the auth server
+ * @param resourceServerUrl - URL of the resource server
+ * @param properties - Additional properties to include in the metadata
+ * @returns Protected resource metadata, serializable to JSON
+ */
+export function generateProtectedResourceMetadata({
+  authServerUrl,
+  resourceUrl,
+  properties,
+}: {
+  authServerUrl: string;
+  resourceUrl: string;
+  properties?: Record<string, unknown>;
+}) {
+  return Object.assign(
+    {
+      resource: resourceUrl,
+      authorization_servers: [authServerUrl],
+      token_types_supported: ["urn:ietf:params:oauth:token-type:access_token"],
+      token_introspection_endpoint: `${authServerUrl}/oauth/token`,
+      token_introspection_endpoint_auth_methods_supported: [
+        "client_secret_post",
+        "client_secret_basic",
+      ],
+      jwks_uri: `${authServerUrl}/.well-known/jwks.json`,
+      authorization_data_types_supported: ["oauth_scope"],
+      authorization_data_locations_supported: ["header", "body"],
+      key_challenges_supported: [
+        {
+          challenge_type: "urn:ietf:params:oauth:pkce:code_challenge",
+          challenge_algs: ["S256"],
         },
-      }
-    );
-
-    this.fusionAuth = new FusionAuthTools(config);
-    this.setupHandlers();
-  }
-
-  private setupHandlers() {
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: [
-          {
-            name: 'create_user',
-            description: 'Create a new user in FusionAuth',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                email: {
-                  type: 'string',
-                  format: 'email',
-                  description: 'User email address',
-                },
-                password: {
-                  type: 'string',
-                  description: 'User password (optional)',
-                },
-                firstName: {
-                  type: 'string',
-                  description: 'User first name (optional)',
-                },
-                lastName: {
-                  type: 'string',
-                  description: 'User last name (optional)',
-                },
-                username: {
-                  type: 'string',
-                  description: 'Username (optional)',
-                },
-                data: {
-                  type: 'object',
-                  description: 'Additional user data (optional)',
-                },
-              },
-              required: ['email'],
-            },
-          },
-          {
-            name: 'get_user',
-            description: 'Retrieve a user by ID or email',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                userId: {
-                  type: 'string',
-                  format: 'uuid',
-                  description: 'User ID',
-                },
-                email: {
-                  type: 'string',
-                  format: 'email',
-                  description: 'User email address',
-                },
-              },
-            },
-          },
-          {
-            name: 'search_users',
-            description: 'Search for users using a query string',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                queryString: {
-                  type: 'string',
-                  description: 'Search query string (optional)',
-                },
-                numberOfResults: {
-                  type: 'number',
-                  minimum: 1,
-                  maximum: 500,
-                  description: 'Number of results to return (default: 25)',
-                },
-                startRow: {
-                  type: 'number',
-                  minimum: 0,
-                  description: 'Starting row for pagination (default: 0)',
-                },
-              },
-            },
-          },
-          {
-            name: 'update_user',
-            description: 'Update an existing user',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                userId: {
-                  type: 'string',
-                  format: 'uuid',
-                  description: 'User ID',
-                },
-                user: {
-                  type: 'object',
-                  properties: {
-                    email: {
-                      type: 'string',
-                      format: 'email',
-                      description: 'User email address',
-                    },
-                    firstName: {
-                      type: 'string',
-                      description: 'User first name',
-                    },
-                    lastName: {
-                      type: 'string',
-                      description: 'User last name',
-                    },
-                    username: {
-                      type: 'string',
-                      description: 'Username',
-                    },
-                    data: {
-                      type: 'object',
-                      description: 'Additional user data',
-                    },
-                  },
-                },
-              },
-              required: ['userId', 'user'],
-            },
-          },
-          {
-            name: 'delete_user',
-            description: 'Delete a user from FusionAuth',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                userId: {
-                  type: 'string',
-                  format: 'uuid',
-                  description: 'User ID',
-                },
-                hardDelete: {
-                  type: 'boolean',
-                  description: 'Whether to hard delete the user (default: false)',
-                },
-              },
-              required: ['userId'],
-            },
-          },
-          {
-            name: 'create_application',
-            description: 'Create a new application in FusionAuth',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                name: {
-                  type: 'string',
-                  description: 'Application name',
-                },
-                roles: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      name: {
-                        type: 'string',
-                        description: 'Role name',
-                      },
-                      description: {
-                        type: 'string',
-                        description: 'Role description',
-                      },
-                    },
-                    required: ['name'],
-                  },
-                  description: 'Application roles (optional)',
-                },
-              },
-              required: ['name'],
-            },
-          },
-          {
-            name: 'get_applications',
-            description: 'Retrieve all applications',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
-          },
-        ],
-      };
-    });
-
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      try {
-        const { name, arguments: args } = request.params;
-
-        switch (name) {
-          case 'create_user': {
-            const validatedArgs = CreateUserSchema.parse(args);
-            const result = await this.fusionAuth.createUser(validatedArgs);
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
-            };
-          }
-
-          case 'get_user': {
-            const validatedArgs = GetUserSchema.parse(args);
-            const result = await this.fusionAuth.getUser(
-              validatedArgs.userId,
-              validatedArgs.email
-            );
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
-            };
-          }
-
-          case 'search_users': {
-            const validatedArgs = SearchUsersSchema.parse(args);
-            const result = await this.fusionAuth.searchUsers(validatedArgs);
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
-            };
-          }
-
-          case 'update_user': {
-            const validatedArgs = UpdateUserSchema.parse(args);
-            const result = await this.fusionAuth.updateUser(validatedArgs);
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
-            };
-          }
-
-          case 'delete_user': {
-            const validatedArgs = DeleteUserSchema.parse(args);
-            const result = await this.fusionAuth.deleteUser(validatedArgs);
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
-            };
-          }
-
-          case 'create_application': {
-            const validatedArgs = CreateApplicationSchema.parse(args);
-            const result = await this.fusionAuth.createApplication(validatedArgs);
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
-            };
-          }
-
-          case 'get_applications': {
-            const result = await this.fusionAuth.getApplications();
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
-            };
-          }
-
-          default:
-            throw new McpError(
-              ErrorCode.MethodNotFound,
-              `Unknown tool: ${name}`
-            );
-        }
-      } catch (error) {
-        if (error instanceof McpError) {
-          throw error;
-        }
-        throw new McpError(
-          ErrorCode.InternalError,
-          `Error executing tool: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    });
-  }
-
-  async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-  }
+      ],
+    },
+    properties
+  );
 }
+
+/**
+ * Generates protected resource metadata for the given a FusionAuth instance
+ * and resource origin.
+ *
+ * @see https://datatracker.ietf.org/doc/html/rfc9728
+ * @param apiKey - FusionAuth API key
+ * @param origin - Origin of the resource to which the metadata applies
+ * @returns Protected resource metadata, serializable to JSON
+ */
+export function generateFusionAuthProtectedResourceMetadata({
+  authServerUrl,
+  resourceUrl,
+  properties,
+}: {
+  authServerUrl: string;
+  resourceUrl: string;
+  properties?: Record<string, unknown>;
+}) {
+  return generateProtectedResourceMetadata({
+    authServerUrl,
+    resourceUrl,
+    properties: {
+      service_documentation: "https://fusionauth.io/docs",
+      ...properties,
+    },
+  });
+}
+
+export function fetchFusionAuthAuthorizationServerMetadata({
+  authServerUrl,
+}: {
+  authServerUrl: string;
+}) {
+
+  return fetch(`${authServerUrl}/.well-known/oauth-authorization-server`)
+    .then((res) => res.json())
+    .then((metadata) => {
+      return metadata;
+    });
+}
+
+/**
+ * Verifies a FusionAuth token and returns data in the format expected to be passed
+ * as `authData to the MCP SDK. In TypeScript, this is the validateJWT function return type.
+ * @param jwt - The JWT token returned from FusionAuth
+ * @param token - The accessToken from FusionAuth, typically app.at cookie
+ * @returns AuthInfo type, see `import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";`
+ */
+export function verifyFusionAuthToken(
+  jwt: JWT,
+  token: string | undefined
+): AuthInfo | undefined {
+  if (!token) return undefined;
+
+  if (!jwt.exp) {
+    console.error("Invalid OAuth access token");
+    return undefined;
+  }
+
+  if (jwt.typ !== "JWT") {
+    throw new Error(
+      "must be a JWT token with typ=JWT in the header"
+    );
+  }
+
+  // None of these _should_ ever happen
+  if (!jwt.aud) {
+    console.error("FusionAuth error: No aud (clientId)");
+    return undefined;
+  }
+
+  if (!jwt.scopes) {
+    console.error("FusionAuth error: No scopes returned");
+    return undefined;
+  }
+
+  if (!jwt.sub) {
+    console.error("FusionAuth error: No sub (userId) returned");
+    return undefined;
+  }
+
+  return {
+    token,
+    scopes: jwt.scopes,
+    clientId: jwt.clientId || jwt.aud,
+    extra: { userId: jwt.sub },
+  };
+}
+
+/**
+ * CORS headers for OAuth metadata endpoints
+ */
+export const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Max-Age": "86400",
+};
